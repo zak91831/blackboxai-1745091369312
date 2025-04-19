@@ -11,35 +11,15 @@ from urllib.parse import urlparse
 from urllib.request import urlopen
 from pathlib import Path
 
-try:
-    import fitz  # PyMuPDF
-except ImportError:
-    print("PyMuPDF is required. Install with: pip install pymupdf")
-    sys.exit(1)
+import logging
+import fitz  # PyMuPDF
+from pdfminer.high_level import extract_text
+import yaml
+import requests
+from bs4 import BeautifulSoup
 
-try:
-    from pdfminer.high_level import extract_text
-except ImportError:
-    print("pdfminer.six is required. Install with: pip install pdfminer.six")
-    sys.exit(1)
-
-try:
-    import yaml
-except ImportError:
-    print("pyyaml is required. Install with: pip install pyyaml")
-    sys.exit(1)
-
-try:
-    import requests
-except ImportError:
-    print("requests is required. Install with: pip install requests")
-    sys.exit(1)
-
-try:
-    from bs4 import BeautifulSoup
-except ImportError:
-    print("beautifulsoup4 is required. Install with: pip install beautifulsoup4")
-    sys.exit(1)
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+logger = logging.getLogger(__name__)
 
 # Regex patterns for URL and token extraction
 REGISTRATION_LINK_PATTERN = re.compile(
@@ -55,9 +35,10 @@ API_KEY_PATTERN = re.compile(
 
 def download_pdf(url):
     try:
+        from urllib.request import urlopen
         with urlopen(url) as response:
             if response.status != 200:
-                print(f"Failed to download PDF from {url}, status code {response.status}")
+                logger.error(f"Failed to download PDF from {url}, status code {response.status}")
                 return None
             data = response.read()
             tmp_file = tempfile.NamedTemporaryFile(delete=False, suffix=".pdf")
@@ -65,7 +46,7 @@ def download_pdf(url):
             tmp_file.close()
             return tmp_file.name
     except Exception as e:
-        print(f"Error downloading PDF from {url}: {e}")
+        logger.error(f"Error downloading PDF from {url}: {e}")
         return None
 
 def extract_metadata(filepath):
@@ -73,17 +54,17 @@ def extract_metadata(filepath):
     try:
         result = subprocess.run(['exiftool', '-j', filepath], capture_output=True, text=True)
         if result.returncode != 0:
-            print(f"Exiftool error: {result.stderr.strip()}")
+            logger.error(f"Exiftool error: {result.stderr.strip()}")
             return {}
         metadata_list = json.loads(result.stdout)
         if metadata_list and isinstance(metadata_list, list):
             return metadata_list[0]
         return {}
     except FileNotFoundError:
-        print("exiftool not found. Please install exiftool to extract metadata.")
+        logger.error("exiftool not found. Please install exiftool to extract metadata.")
         return {}
     except Exception as e:
-        print(f"Error extracting metadata: {e}")
+        logger.error(f"Error extracting metadata: {e}")
         return {}
 
 def extract_urls_and_text(filepath):
@@ -94,7 +75,7 @@ def extract_urls_and_text(filepath):
     try:
         text_content = extract_text(filepath)
     except Exception as e:
-        print(f"Error extracting text with pdfminer: {e}")
+        logger.error(f"Error extracting text with pdfminer: {e}")
 
     # Extract URLs using PyMuPDF
     try:
@@ -106,7 +87,7 @@ def extract_urls_and_text(filepath):
                 if uri:
                     urls.add(uri)
     except Exception as e:
-        print(f"Error extracting URLs with PyMuPDF: {e}")
+        logger.error(f"Error extracting URLs with PyMuPDF: {e}")
 
     return text_content, list(urls)
 
