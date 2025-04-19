@@ -1,0 +1,5 @@
+pdfminer.six
+PyMuPDF
+pyyaml
+requests
+beautifulsoup4
